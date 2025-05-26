@@ -1,11 +1,402 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>简易商城</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background: #f5f5f5; color: #333; }
+        
+        /* 分类导航 */
+        .category-nav {
+            width: 20%;
+            float: left;
+            background: #fff;
+            height: 100vh;
+            overflow-y: auto;
+            border-right: 1px solid #eee;
+        }
+        .category-item {
+            padding: 15px 10px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+            text-align: center;
+        }
+        .category-item.active {
+            background: #1989fa;
+            color: white;
+        }
+        
+        /* 商品列表 */
+        .product-list {
+            width: 80%;
+            float: right;
+            padding: 10px;
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+        }
+        .product-card {
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            padding: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .product-img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .product-name {
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .product-desc {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .product-price {
+            color: #f44;
+            font-weight: bold;
+        }
+        .product-discount {
+            font-size: 12px;
+            color: #1989fa;
+            margin-top: 3px;
+        }
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .quantity-btn {
+            width: 25px;
+            height: 25px;
+            background: #f7f8fa;
+            border: none;
+            font-size: 16px;
+        }
+        .quantity-input {
+            width: 40px;
+            height: 25px;
+            text-align: center;
+            border: 1px solid #f7f8fa;
+            margin: 0 5px;
+        }
+        
+        /* 购物车 */
+        .cart-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            border-top: 1px solid #eee;
+            z-index: 100;
+        }
+        .cart-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+        .cart-total {
+            flex-grow: 1;
+            font-weight: bold;
+        }
+        .checkout-btn {
+            background: #1989fa;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+        }
+        
+        /* 弹窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 8px;
+            padding: 15px;
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            background: none;
+            border: none;
+        }
+        .modal-img {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+        }
+    </style>
 </head>
 <body>
-    <h1>商品加载中...</h1>
-    <!-- 后续通过Git上传到您的仓库 -->
+    <!-- 分类导航 -->
+    <div class="category-nav" id="categoryNav">
+        <!-- 动态生成 -->
+    </div>
+    
+    <!-- 商品列表 -->
+    <div class="product-list" id="productList">
+        <!-- 动态生成 -->
+    </div>
+    
+    <!-- 购物车 -->
+    <div class="cart-bar">
+        <div class="cart-icon">🛒</div>
+        <div class="cart-total">¥0.00</div>
+        <button class="checkout-btn" id="checkoutBtn">提交订单</button>
+    </div>
+    
+    <!-- 商品详情弹窗 -->
+    <div class="modal" id="productModal">
+        <div class="modal-content">
+            <button class="close-modal" id="closeModal">×</button>
+            <img class="modal-img" id="modalImg" src="" alt="商品图片">
+        </div>
+    </div>
+    
+    <!-- 订单确认弹窗 -->
+    <div class="modal" id="orderModal">
+        <div class="modal-content">
+            <h3>订单提交成功</h3>
+            <p>订单编号: <span id="orderNumber"></span></p>
+            <button id="copyOrder">复制订单号</button>
+        </div>
+    </div>
+
+    <script>
+        // 商品数据
+        const products = [
+            {
+                id: "kcs-001",
+                category: "药品",
+                name: "蜈蚣药",
+                thumb: "assets/kcs-thumb.jpg",
+                images: ["assets/kcs-1.jpg"],
+                price: 99,
+                discount: "满3件8折",
+                desc: "百年秘方，祛风止痛"
+            },
+            {
+                id: "bt-001",
+                category: "鼻通",
+                name: "八仙鼻通",
+                thumb: "assets/bt-thumb.jpg",
+                images: ["assets/bt-1.jpg"],
+                price: 68,
+                discount: "第二件半价",
+                desc: "快速缓解鼻塞"
+            },
+            {
+                id: "coffee-001",
+                category: "饮品",
+                name: "减肥咖啡",
+                thumb: "assets/coffee-thumb.jpg",
+                images: ["assets/coffee-1.jpg"],
+                price: 128,
+                discount: "满200减30",
+                desc: "天然配方，加速代谢"
+            }
+        ];
+        
+        // 购物车数据
+        let cart = {};
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            renderCategories();
+            renderProducts();
+            setupEventListeners();
+        });
+        
+        // 渲染分类
+        function renderCategories() {
+            const categories = [...new Set(products.map(p => p.category))];
+            const categoryNav = document.getElementById('categoryNav');
+            
+            categories.forEach(category => {
+                const div = document.createElement('div');
+                div.className = 'category-item';
+                div.textContent = category;
+                div.addEventListener('click', () => {
+                    document.querySelectorAll('.category-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    div.classList.add('active');
+                    renderProducts(category);
+                });
+                categoryNav.appendChild(div);
+            });
+            
+            // 默认选中第一个分类
+            if (categories.length > 0) {
+                categoryNav.firstChild.classList.add('active');
+            }
+        }
+        
+        // 渲染商品
+        function renderProducts(category = null) {
+            const productList = document.getElementById('productList');
+            productList.innerHTML = '';
+            
+            const filteredProducts = category 
+                ? products.filter(p => p.category === category)
+                : products;
+                
+            filteredProducts.forEach(product => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                
+                card.innerHTML = `
+                    <img class="product-img" src="${product.thumb}" alt="${product.name}">
+                    <div class="product-name">${product.name}</div>
+                    <div class="product-desc">${product.desc}</div>
+                    <div class="product-price">¥${product.price.toFixed(2)}</div>
+                    <div class="product-discount">${product.discount}</div>
+                    <div class="quantity-control">
+                        <button class="quantity-btn minus">-</button>
+                        <input type="number" class="quantity-input" value="0" min="0">
+                        <button class="quantity-btn plus">+</button>
+                    </div>
+                `;
+                
+                // 点击图片/名称/描述/价格查看大图
+                const clickableElements = card.querySelectorAll('.product-img, .product-name, .product-desc, .product-price');
+                clickableElements.forEach(el => {
+                    el.style.cursor = 'pointer';
+                    el.addEventListener('click', () => showProductModal(product));
+                });
+                
+                // 数量控制
+                const minusBtn = card.querySelector('.minus');
+                const plusBtn = card.querySelector('.plus');
+                const quantityInput = card.querySelector('.quantity-input');
+                
+                minusBtn.addEventListener('click', () => {
+                    let qty = parseInt(quantityInput.value);
+                    if (qty > 0) {
+                        quantityInput.value = qty - 1;
+                        updateCart(product, qty - 1);
+                    }
+                });
+                
+                plusBtn.addEventListener('click', () => {
+                    let qty = parseInt(quantityInput.value) + 1;
+                    quantityInput.value = qty;
+                    updateCart(product, qty);
+                });
+                
+                quantityInput.addEventListener('change', () => {
+                    let qty = parseInt(quantityInput.value) || 0;
+                    quantityInput.value = qty;
+                    updateCart(product, qty);
+                });
+                
+                // 初始化购物车数量
+                if (cart[product.id]) {
+                    quantityInput.value = cart[product.id].quantity;
+                }
+                
+                productList.appendChild(card);
+            });
+        }
+        
+        // 更新购物车
+        function updateCart(product, quantity) {
+            if (quantity > 0) {
+                cart[product.id] = {
+                    ...product,
+                    quantity: quantity
+                };
+            } else {
+                delete cart[product.id];
+            }
+            updateCartTotal();
+        }
+        
+        // 更新购物车总价
+        function updateCartTotal() {
+            let total = 0;
+            Object.values(cart).forEach(item => {
+                total += item.price * item.quantity;
+            });
+            
+            document.querySelector('.cart-total').textContent = `¥${total.toFixed(2)}`;
+        }
+        
+        // 显示商品大图
+        function showProductModal(product) {
+            const modal = document.getElementById('productModal');
+            const modalImg = document.getElementById('modalImg');
+            
+            modalImg.src = product.images[0];
+            modal.style.display = 'flex';
+        }
+        
+        // 设置事件监听
+        function setupEventListeners() {
+            // 关闭商品弹窗
+            document.getElementById('closeModal').addEventListener('click', () => {
+                document.getElementById('productModal').style.display = 'none';
+            });
+            
+            // 提交订单
+            document.getElementById('checkoutBtn').addEventListener('click', () => {
+                if (Object.keys(cart).length === 0) {
+                    alert('购物车为空');
+                    return;
+                }
+                
+                const now = new Date();
+                const orderNumber = `ORD-${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+                
+                document.getElementById('orderNumber').textContent = orderNumber;
+                document.getElementById('orderModal').style.display = 'flex';
+                
+                // 这里可以添加订单保存逻辑
+                console.log('订单已提交:', {
+                    orderNumber,
+                    timestamp: now.toISOString(),
+                    items: cart
+                });
+            });
+            
+            // 复制订单号
+            document.getElementById('copyOrder').addEventListener('click', () => {
+                const orderNumber = document.getElementById('orderNumber').textContent;
+                navigator.clipboard.writeText(orderNumber).then(() => {
+                    alert('订单号已复制');
+                    document.getElementById('orderModal').style.display = 'none';
+                    cart = {}; // 清空购物车
+                    updateCartTotal();
+                    renderProducts(); // 重置商品数量显示
+                });
+            });
+        }
+    </script>
 </body>
 </html>
